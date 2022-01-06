@@ -1,0 +1,207 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 12,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# import Packages \n",
+    "from gmpy2 import random_state, mpz_urandomb, bit_set, next_prime, bit_length, num_digits, mpz_random, gcd, invert, powmod, mpz\n",
+    "import time"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 13,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "## Generate prime numbers using gmpy2\n",
+    "def get_prime(size):\n",
+    "    seed = random_state(time.time_ns())\n",
+    "    p = mpz_urandomb(seed ,size)\n",
+    "    p = p.bit_set(size - 1)\n",
+    "    return next_prime(p)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Generate Paillier Private and Public Keys."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 14,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def get_paillier_keys(size):\n",
+    "    p = get_prime(size//2)\n",
+    "    while True:\n",
+    "        q = get_prime(size//2)\n",
+    "        N =  p*q\n",
+    "        phi = (p-1)*(q-1)\n",
+    "        if gcd(N, phi)== 1:\n",
+    "            break\n",
+    "    g = 1 + N\n",
+    "    pub_key = N, g\n",
+    "    priv_key = phi, max(p,q), min(p,q)\n",
+    "    return pub_key, priv_key "
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Test"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 15,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "N== 8201529683304167469180157122194493129018422881740713654223570141355208440557840677909762132443284526246701446786256777828187175679754780645948452756555337\n",
+      "g== 8201529683304167469180157122194493129018422881740713654223570141355208440557840677909762132443284526246701446786256777828187175679754780645948452756555338\n",
+      "phi== 8201529683304167469180157122194493129018422881740713654223570141355208440557658337673063932885967925292592890772031833273119842087523188278567708934955536\n",
+      "p== 101680151483428741409820878948837859745809867320940008150054961764306359643309\n",
+      "q== 80660085214770815906780075159718154479134687746393584081537405616437461956493\n"
+     ]
+    }
+   ],
+   "source": [
+    "pub_key, priv_key  = get_paillier_keys(512)\n",
+    "print(\"N==\", pub_key[0])\n",
+    "print(\"g==\", pub_key[1])\n",
+    "print(\"phi==\", priv_key[0])\n",
+    "print(\"p==\", priv_key[1])\n",
+    "print(\"q==\", priv_key[2])"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Paillier encryption and decryption functions"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 16,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def get_r(pub_key):\n",
+    "    while True:\n",
+    "        seed = random_state(time.time_ns())\n",
+    "        r = mpz_random(seed, pub_key)\n",
+    "        if gcd(r, pub_key[0])== 1:\n",
+    "            break\n",
+    "    return r\n",
+    "\n",
+    "def paillier_encrypt(message, pub_key):\n",
+    "    # get random value r\n",
+    "    r = get_r(pub_key[0])\n",
+    "    # encrypt the message\n",
+    "    N2 = pub_key[0] ** 2\n",
+    "    r = powmod(r, pub_key[0], N2)\n",
+    "    c = powmod(pub_key[1], message, N2)\n",
+    "    c = c*r % N2\n",
+    "    return c\n",
+    "\n",
+    "def paillier_decrypt(enc, priv_key, pub_key):\n",
+    "    N2 = pub_key ** 2\n",
+    "    phiInv = invert(priv_key, pub_key)\n",
+    "    m = powmod(enc, priv_key, N2)\n",
+    "    m = m - 1 \n",
+    "    m = m//pub_key\n",
+    "    m = m * phiInv % pub_key\n",
+    "    return m\n",
+    "\n",
+    "def paillier_decrypt_CRT(enc, priv_key, pub_key):\n",
+    "    xp = powmod(enc, priv_key[0], priv_key[1]**2)\n",
+    "    xq = powmod(enc, priv_key[0], priv_key[2]**2)\n",
+    "    Invq = invert(priv_key[2]**2, priv_key[1]**2)\n",
+    "    x = ((Invq*(xp-xq))% priv_key[1]**2)*priv_key[2]**2 +  xq\n",
+    "    m = ((x-1)//pub_key[0]*invert(priv_key[0], pub_key[0])) % pub_key[0]\n",
+    "    return m"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Test"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 17,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "clear message =  102132100\n",
+      "encrypted message =  14773566157558790435343402448498974826786063088576954086497202243362011118435741203272143454239692972284176798448914529182202907091198794448491806313686821183026896347803490240688005852112222060678107741252431897577238171585443090140697563942758364024288521614882045931747853185858206948399230916877177659441\n",
+      "decrypted message =  102132100\n",
+      "decrypted message by CRT =  102132100\n"
+     ]
+    }
+   ],
+   "source": [
+    "message = mpz(102132100)\n",
+    "print(\"clear message = \", message)\n",
+    "enc = paillier_encrypt(message, pub_key)\n",
+    "print(\"encrypted message = \", enc)\n",
+    "m = paillier_decrypt(enc, priv_key[0], pub_key[0])\n",
+    "print(\"decrypted message = \", m)\n",
+    "m_crt = paillier_decrypt_CRT(enc, priv_key, pub_key)\n",
+    "print(\"decrypted message by CRT = \", m)\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.7.9"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 4
+}

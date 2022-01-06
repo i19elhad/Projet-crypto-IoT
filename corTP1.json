@@ -1,0 +1,188 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# import Packages \n",
+    "from gmpy2 import random_state, mpz_urandomb, bit_set, next_prime, bit_length, num_digits, mpz_random, gcd, invert, powmod, mpz, is_prime\n",
+    "import time"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def get_elgamal_prime(size):\n",
+    "    while True:\n",
+    "        seed = random_state(int(time.time()*1000))\n",
+    "        q = mpz_urandomb(seed, size-2)\n",
+    "        q = q.bit_set(size-2)\n",
+    "        q = next_prime(q)\n",
+    "        p = 2*q + 1\n",
+    "        if is_prime(p):\n",
+    "            break\n",
+    "    return p\n",
+    "\n",
+    "def get_generator(p):\n",
+    "    while True:\n",
+    "        seed = random_state(int(time.time()*1000))\n",
+    "        g = mpz_random(seed, p)\n",
+    "        if powmod(g,2,p)!= 1 and powmod(g,(p-1)//2,p)!= 1:\n",
+    "            break\n",
+    "    return g\n",
+    "\n",
+    "def get_exp(p):\n",
+    "    while True:\n",
+    "        seed = random_state(int(time.time()*1000))\n",
+    "        b = mpz_random(seed, p-1)\n",
+    "        if b != 0:\n",
+    "            break\n",
+    "    return b\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Generate El Gamal Private and Public Keys."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def get_elgamal_keys(size):\n",
+    "    p = get_elgamal_prime(size)\n",
+    "    g = get_generator(p)\n",
+    "    b = get_exp(p)\n",
+    "    B = powmod(g, b, p)\n",
+    "    pub_key = p, g, B\n",
+    "    priv_key = b\n",
+    "    return pub_key, priv_key\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Test"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "p== 9556624134165436924539587135806928596063454465538760806703055344328547435100710847811036900518641988055293373669620339645285150533895779778449281832217343\n",
+      "g== 5638248139183959986267093495336512304599103719687957954080440165482722742327306564596592938465310140266636781585403683126573826401058704866880062857326932\n",
+      "B== 1353813662691959712942196577783844291448479067616754833561170352271743470590919080728972301924712466540193775452485208306150642252658100579264844362452874\n",
+      "b== 4940657117569383409034019965402510441987529988024272136316427192552315180826850889466609996483371136358531877413224275505967310439451493319732495313082524\n"
+     ]
+    }
+   ],
+   "source": [
+    "pub_key, priv_key  = get_elgamal_keys(512)\n",
+    "print(\"p==\", pub_key[0])\n",
+    "print(\"g==\", pub_key[1])\n",
+    "print(\"B==\", pub_key[2])\n",
+    "print(\"b==\", priv_key)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## El Gamal encryption and decryption functions"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def elgamal_encrypt(message, pub_key):\n",
+    "    # get random value k \n",
+    "    k = get_exp(pub_key[0])\n",
+    "    K = powmod(pub_key[1], k, pub_key[0])\n",
+    "    # encrypt the message\n",
+    "    enc = message * powmod(pub_key[2], k, pub_key[0]) % pub_key[0]\n",
+    "    return enc, K\n",
+    "\n",
+    "def elgamal_decrypt(enc, K, priv_key, pub_key):\n",
+    "    message = enc * powmod(K, -1*priv_key, pub_key[0]) % pub_key[0]\n",
+    "    return message"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Test"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "clear message =  102132100\n",
+      "encrypted message =  8891973726894634220179726180801439324119360766409030108939984321167219593679790039378756052223431281843822916923564792656323038830131249684723670266067379\n",
+      "decrypted message =  102132100\n"
+     ]
+    }
+   ],
+   "source": [
+    "message = mpz(102132100)\n",
+    "print(\"clear message = \", message)\n",
+    "enc, K = elgamal_encrypt(message, pub_key)\n",
+    "print(\"encrypted message = \", enc)\n",
+    "m = elgamal_decrypt(enc, K, priv_key, pub_key)\n",
+    "print(\"decrypted message = \", m)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.7.9"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 4
+}
