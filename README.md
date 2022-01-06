@@ -1,4 +1,4 @@
-# Projet de l'UE Cryptographie Avancée
+# Projet de Cryptographie Avancée
 
 **<u>Subject :</u>** Cryptosystem Conversion, Packing and Matrix Processing of Homomorphically Encrypted Data: Application to IOT Devices
 
